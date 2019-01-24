@@ -32,6 +32,7 @@ use Bio::EnsEMBL::Utils::Sequence qw(reverse_comp);
 use File::Basename;
 use POSIX qw(strftime);
 use JSON;
+use List::Util qw(uniq);
 
 my $config = configure();
 
@@ -401,26 +402,41 @@ sub get_allele_info {
 sub get_merges {
   my ($rs_json) = @_;
 
-  debug("\n>>>> get_merges <<<<") if ($debug);
-
-  # On 2017-07-19 the merge field was called 'dbsnp1_merges', was
-  # expecting it to be called merges
-  my $merge_field = 'merges';
-  $merge_field = 'dbsnp1_merges';
-  my $merges = $rs_json->{$merge_field};
-
+  # Get the dbsnp1_merges
+  my $dbsnp1_merges = $rs_json->{'dbsnp1_merges'};
   my @merged_refsnps;
 
   # Format of merges
-  # merge_event {
-  # merged_rsid (string):
-  # revision (string):
-  # merge_date (string):
+  # dbsnp1_merge_event {
+  #   merged_rsid (string):
+  #   revision (string):
+  #   merge_date (string):
   # }
-  for my $merge (@$merges) {
-      push @merged_refsnps,  "rs" . $merge->{'merged_rsid'};
+  for my $dbsnp1_merge_event (@$dbsnp1_merges) {
+    push @merged_refsnps,  "rs" . $dbsnp1_merge_event->{'merged_rsid'};
+  }
+
+  # Get the dbsnp2_merges
+  my $dbsnp2_merges = get_dbsnp2_merges($rs_json);
+  push @merged_refsnps, @$dbsnp2_merges;
+  my @uniq_merges = uniq @merged_refsnps;
+  return \@uniq_merges;
+}
+
+sub get_dbsnp2_merges {
+  my ($rs_json) = @_;
+  my %dbsnp2_merges;
+  my $present_obs_movements = $rs_json->{'present_obs_movements'};
+  for my $pom (@$present_obs_movements) {
+    my $prev_rel_rsids = $pom->{'previous_release'}->{'rsids'};
+    for my $prev_rel_rsid (@$prev_rel_rsids) {
+      # Only store if not equal to refsnp_id
+      if ($prev_rel_rsid != $rs_json->{'refsnp_id'}) {
+        $dbsnp2_merges{$prev_rel_rsid}++;
+      }
     }
-  return \@merged_refsnps;
+  }
+  return [ map { 'rs'. $_} keys %dbsnp2_merges];
 }
 
 sub get_hgvs {
