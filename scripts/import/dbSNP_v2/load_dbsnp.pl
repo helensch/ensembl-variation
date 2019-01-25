@@ -205,7 +205,8 @@ sub parse_refsnp {
 
   # Merges
   $data->{'merges'} = get_merges($rs_json);
-  
+  $data->{'dbsnp2_merges'} = get_dbsnp2_merges($rs_json);
+
   # HGVS
   $data->{'hgvs'} = get_hgvs($config, $rs_json);
 
@@ -415,12 +416,7 @@ sub get_merges {
   for my $dbsnp1_merge_event (@$dbsnp1_merges) {
     push @merged_refsnps,  "rs" . $dbsnp1_merge_event->{'merged_rsid'};
   }
-
-  # Get the dbsnp2_merges
-  my $dbsnp2_merges = get_dbsnp2_merges($rs_json);
-  push @merged_refsnps, @$dbsnp2_merges;
-  my @uniq_merges = uniq @merged_refsnps;
-  return \@uniq_merges;
+  return \@merged_refsnps;
 }
 
 sub get_dbsnp2_merges {
@@ -838,6 +834,10 @@ sub import_refsnp {
                 $rs_data->{'merges'},
                 $config->{'source_id'}->{'Archive dbSNP'});
 
+  import_merges($dbh, $variation_id,
+                $rs_data->{'dbsnp2_merges'},
+                $config->{'source_id'}->{'Former dbSNP'});
+  
   import_hgvs($dbh, $variation_id,
               $rs_data->{'hgvs'},
               $config->{'source_id'}->{'dbSNP HGVS'});
@@ -1788,7 +1788,7 @@ sub get_batch_id {
 sub get_sources {
   my ($dbh) = @_;
 
-  my @source_names = ('dbSNP', 'Archive dbSNP', 'dbSNP HGVS');
+  my @source_names = ('dbSNP', 'Archive dbSNP', 'dbSNP HGVS', 'Former dbSNP');
 
   my $sources = {};
   my $source_id;
